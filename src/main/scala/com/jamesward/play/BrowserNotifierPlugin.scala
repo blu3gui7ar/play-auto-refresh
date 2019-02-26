@@ -23,15 +23,16 @@ object BrowserNotifierPlugin extends AutoPlugin {
     val browserNotification = taskKey[Unit]("Browser Notification")
     val openBrowser = taskKey[Unit]("Open Play App in Browser")
     val shouldOpenBrowser = settingKey[Boolean]("Should the web browser automatically open when running the app")
+    val openBrowserUrl = settingKey[String]("The url to open")
   }
 
   import autoImport._
 
-  def maybeOpenBrowser(shouldOpenBrowser: Boolean, playPort: Int, log: Logger): Unit = {
+  def maybeOpenBrowser(shouldOpenBrowser: Boolean, openBrowserUrl: String, log: Logger): Unit = {
     if (shouldOpenBrowser) {
       sys.props("os.name").toLowerCase match {
-        case x if x contains "mac" => s"open http://localhost:$playPort".!
-        case _ if Desktop.isDesktopSupported => Desktop.getDesktop.browse(new URI(s"http://localhost:$playPort"))
+        case x if x contains "mac" => s"open $openBrowserUrl".!
+        case _ if Desktop.isDesktopSupported => Desktop.getDesktop.browse(new URI(s"openBrowserUrl"))
         case _ => log.error("Attempted to open web browser, but the current desktop environment is not supported.")
       }
     }
@@ -43,8 +44,9 @@ object BrowserNotifierPlugin extends AutoPlugin {
 
   lazy val baseBrowserNotifierPluginSettings: Seq[Def.Setting[_]] = Seq(
     browserNotification := sendWebSocketMessage(PlayKeys.playDefaultPort.value),
-    openBrowser := maybeOpenBrowser(shouldOpenBrowser.value, PlayKeys.playDefaultPort.value, streams.value.log),
+    openBrowser := maybeOpenBrowser(shouldOpenBrowser.value, openBrowserUrl.value, streams.value.log),
     shouldOpenBrowser := true,
+    openBrowserUrl := "http://localhost:" + PlayKeys.playDefaultPort.value,
     PlayKeys.playRunHooks += new BrowserNotifierPlayRunHook(state.value, streams.value.log),
     compile in Compile := {
       val compileAnalysis = (compile in Compile).value
@@ -73,7 +75,7 @@ object BrowserNotifierPlugin extends AutoPlugin {
       )
     }
 
-    override def afterStarted(addr: InetSocketAddress): Unit = {
+    override def afterStarted(/*addr: InetSocketAddress*/): Unit = {
       server.start()
       Project.runTask(openBrowser, state)
       log.info("Started auto-refresh WebSocket on port 9001")
